@@ -403,8 +403,16 @@ async def handle_analysis_completed(result: AnalysisResult):
 
 1. **Clarify Requirements**: Ask clarifying questions if the task is ambiguous
 2. **Review Architecture**: Read relevant sections of `UW_MainVisualizer.md` and `UW_MainVisualizer_InitialValidation.md`
-3. **Plan Approach**: Draft implementation plan for complex tasks
-4. **Check Existing Code**: Search for similar patterns in the codebase
+3. **Read API Documentation**: Review `docs/api_reference.md` to understand existing APIs
+4. **Reuse Existing APIs**: Use existing functions/classes from the codebase instead of writing duplicate code
+5. **Plan Approach**: Draft implementation plan for complex tasks
+6. **Check Existing Code**: Search for similar patterns in the codebase
+
+> **IMPORTANT**: Before implementing any new functionality, you MUST:
+> - Check if the functionality already exists in `docs/api_reference.md`
+> - If an existing API can fulfill the requirement, use it directly
+> - Only create new functions when no existing API meets the need
+> - When extending functionality, prefer extending existing classes over creating new ones
 
 ### 6.2 Implementation Checklist
 
@@ -443,6 +451,45 @@ For complex features, follow this sequence:
 6. Run tests after each method
 7. Refactor if needed
 ```
+
+### 6.5 API Documentation Requirements
+
+After completing a module and passing all tests, you MUST update `docs/api_reference.md` with:
+
+1. **Module Overview**: Brief description of the module's purpose
+2. **Public Classes**: All public class names with constructor signatures
+3. **Public Methods**: Method signatures with parameter and return types
+4. **Data Models**: All Pydantic models with field descriptions
+5. **Usage Examples**: Working code examples demonstrating typical usage
+
+**Documentation Template**:
+
+```markdown
+## Module Name
+
+### ClassName
+
+**Constructor:**
+\`\`\`python
+def __init__(self, param1: Type1, param2: Type2) -> None
+\`\`\`
+
+**Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `method_name(args)` | `ReturnType` | Brief description |
+
+**Usage Example:**
+\`\`\`python
+# Working code example
+\`\`\`
+```
+
+**Verification Checklist:**
+- [ ] All public APIs documented in `docs/api_reference.md`
+- [ ] Verification script passes: `python scripts/verify_<module>.py`
+- [ ] Usage examples are tested and working
 
 ---
 
@@ -629,7 +676,7 @@ def sample_activity():
 
 | ID | Prohibition | Reason |
 |----|-------------|--------|
-| **P-1** | DO NOT use emojis or emoticons anywhere | Professional codebase standard |
+| **P-1** | DO NOT use emojis, emoticons, or special Unicode symbols (✓✗★●◆ etc.) | Professional codebase standard, use ASCII text like PASS/FAIL |
 | **P-2** | DO NOT downgrade/simplify design when errors occur | Preserves architectural integrity |
 | **P-3** | DO NOT create files exceeding 800 lines | Maintainability |
 | **P-4** | DO NOT create functions exceeding 50 lines | Readability and testability |

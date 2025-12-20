@@ -1,0 +1,61 @@
+# MainVisualizer 主配置文件
+
+app:
+  name: "MainVisualizer"
+  version: "0.1.0"
+  debug: true
+
+ingest:
+  manictime:
+    db_path: "${MANICTIME_DB_PATH}"
+    screenshots_path: "${MANICTIME_SCREENSHOTS_PATH}"
+    readonly: true
+    sync_interval_seconds: 60
+    batch_size: 100
+    screenshot_tolerance_seconds: 30
+
+senatus:
+  ti_weights:
+    visual_sensitive: 0.35
+    metadata_anomaly: 0.25
+    frame_diff: 0.15
+    context_switch: 0.15
+    uncertainty: 0.10
+  thresholds:
+    immediate: 0.8
+    batch: 0.5
+    skip: 0.3
+  context_window_size: 10
+  delay_analysis_seconds: 300
+
+admina:
+  default_provider: "gemini"
+  max_concurrent: 10
+  rate_limit_per_minute: 60
+  timeout_seconds: 30
+  retry_max: 3
+
+cardina:
+  fs1:
+    retention_hours: 24
+  fs2:
+    retention_days: 90
+    aggregation_time: "00:30"
+
+storage:
+  backend: "sqlite"
+  sqlite:
+    path: "./data/mainvisualizer.db"
+
+output:
+  initial_sync:
+    lookback_days: 7
+    max_length: 800
+  narrative:
+    style: "conversational"
+    language: "zh-CN"
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/mv.log"
