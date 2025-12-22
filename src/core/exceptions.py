@@ -113,6 +113,33 @@ class VLMProviderError(MainVisualizerError):
     pass
 
 
+class VLMConnectionError(VLMProviderError):
+    """
+    VLM连接错误
+    
+    当无法连接到VLM服务时抛出。
+    """
+    pass
+
+
+class VLMRateLimitError(VLMProviderError):
+    """
+    VLM速率限制错误
+    
+    当VLM API调用超出速率限制时抛出。
+    """
+    pass
+
+
+class VLMResponseParseError(VLMProviderError):
+    """
+    VLM响应解析错误
+    
+    当无法解析VLM响应内容时抛出。
+    """
+    pass
+
+
 class StorageError(MainVisualizerError):
     """
     存储层错误

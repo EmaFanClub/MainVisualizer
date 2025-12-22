@@ -15,7 +15,10 @@ from .exceptions import (
     ScreenshotNotFoundError,
     SenatusError,
     StorageError,
+    VLMConnectionError,
     VLMProviderError,
+    VLMRateLimitError,
+    VLMResponseParseError,
 )
 from .logger import get_logger, setup_logging
 
@@ -31,6 +34,9 @@ __all__ = [
     "ActivityParseError",
     "SenatusError",
     "VLMProviderError",
+    "VLMConnectionError",
+    "VLMRateLimitError",
+    "VLMResponseParseError",
     "StorageError",
     # 日志工具
     "get_logger",

@@ -5,8 +5,18 @@ core.interfaces包初始化
 """
 
 from .data_source import IActivityDataSource, IScreenshotLoader
+from .vlm_provider import (
+    HealthCheckResult,
+    IVLMProvider,
+    ProviderType,
+    VLMCapabilities,
+)
 
 __all__ = [
+    "HealthCheckResult",
     "IActivityDataSource",
     "IScreenshotLoader",
+    "IVLMProvider",
+    "ProviderType",
+    "VLMCapabilities",
 ]

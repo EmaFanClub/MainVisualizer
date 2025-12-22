@@ -29,11 +29,21 @@ senatus:
   delay_analysis_seconds: 300
 
 admina:
-  default_provider: "gemini"
+  default_provider: "qwen"  # qwen | ollama
   max_concurrent: 10
   rate_limit_per_minute: 60
-  timeout_seconds: 30
-  retry_max: 3
+  
+  providers:
+    qwen:
+      model: "qwen3-vl-plus"
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      timeout_seconds: 60
+      max_retries: 3
+    ollama:
+      model: "llava"
+      host: "${OLLAMA_HOST:-http://localhost:11434}"
+      timeout_seconds: 120
+      max_retries: 2
 
 cardina:
   fs1:
