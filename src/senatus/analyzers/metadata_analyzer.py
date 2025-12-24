@@ -18,29 +18,30 @@ if TYPE_CHECKING:
 
 
 # 高敏感度应用程序模式
+# 注意: ManicTime中的应用名称格式为大写且无.exe后缀(如"CHROME", "MSEDGE")
 HIGH_SENSITIVITY_APP_PATTERNS = [
     # 浏览器 - 可能访问敏感网站
-    r"chrome\.exe",
-    r"firefox\.exe",
-    r"msedge\.exe",
-    r"brave\.exe",
-    r"opera\.exe",
+    r"chrome",
+    r"firefox",
+    r"msedge",
+    r"brave",
+    r"opera",
 
     # 社交和即时通讯
-    r"telegram\.exe",
-    r"discord\.exe",
-    r"wechat\.exe",
-    r"qq\.exe",
-    r"whatsapp\.exe",
+    r"telegram",
+    r"discord",
+    r"wechat",
+    r"qq",
+    r"whatsapp",
 
     # 文件管理器 - 可能浏览敏感文件
-    r"totalcmd\.exe",
-    r"everything\.exe",
+    r"totalcmd",
+    r"everything",
 
     # 远程桌面
-    r"mstsc\.exe",
-    r"anydesk\.exe",
-    r"teamviewer\.exe",
+    r"mstsc",
+    r"anydesk",
+    r"teamviewer",
 ]
 
 # 高敏感度标题关键词
@@ -81,31 +82,33 @@ HIGH_SENSITIVITY_TITLE_KEYWORDS = [
 # 中等敏感度应用程序模式
 MEDIUM_SENSITIVITY_APP_PATTERNS = [
     # 邮件客户端
-    r"outlook\.exe",
-    r"thunderbird\.exe",
+    r"outlook",
+    r"thunderbird",
 
     # 文档工具(可能包含敏感信息)
-    r"winword\.exe",
-    r"excel\.exe",
-    r"acrobat\.exe",
-    r"foxitreader\.exe",
+    r"winword",
+    r"excel",
+    r"acrobat",
+    r"foxitreader",
 ]
 
 # 低敏感度应用程序 - 不太可能包含敏感内容
 LOW_SENSITIVITY_APP_PATTERNS = [
     # 开发工具
-    r"code\.exe",
-    r"devenv\.exe",
-    r"idea64\.exe",
+    r"code",
+    r"devenv",
+    r"idea64",
+    r"cursor",
+    r"pycharm",
 
     # 终端
-    r"windowsterminal\.exe",
-    r"cmd\.exe",
-    r"powershell\.exe",
+    r"windowsterminal",
+    r"cmd",
+    r"powershell",
 
     # 系统工具
-    r"explorer\.exe",
-    r"taskmgr\.exe",
+    r"explorer",
+    r"taskmgr",
 ]
 
 

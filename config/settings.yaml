@@ -21,10 +21,12 @@ senatus:
     frame_diff: 0.15
     context_switch: 0.15
     uncertainty: 0.10
+  # 阈值基于2356条活动数据分析优化 (2025-12-25)
+  # TI分布: avg=0.4515, max=0.6438, P90=0.5455, P95=0.5610
   thresholds:
-    immediate: 0.8
-    batch: 0.5
-    skip: 0.3
+    immediate: 0.55   # P90阈值, 约10%活动触发立即分析
+    batch: 0.45       # P75附近, 约25%活动进入批处理
+    skip: 0.35        # P25附近, 约25%低敏感度活动跳过
   context_window_size: 10
   delay_analysis_seconds: 300
 

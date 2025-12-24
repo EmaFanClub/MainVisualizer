@@ -2,15 +2,7 @@
 """
 Session Context Loader Hook for MainVisualizer
 
-This hook runs at session start (including after auto-compact) to ensure
-Claude has access to essential project context.
-
-加载内容:
-1. API Query Skill - 查询现有 API 的指南
-2. API Doc Writer Skill - 编写新 API 文档的指南
-3. Development Guide - 完整的开发规范文档
-
-Output is sent to stdout and will be injected into Claude's context.
+会话启动时加载精简的项目上下文提醒。
 """
 
 import sys
@@ -18,12 +10,11 @@ from pathlib import Path
 
 
 def get_project_root() -> Path:
-    """Get the project root directory."""
+    """获取项目根目录"""
     import os
     if "CLAUDE_PROJECT_DIR" in os.environ:
         return Path(os.environ["CLAUDE_PROJECT_DIR"])
 
-    # Fallback: find MainVisualizer directory
     current = Path(__file__).resolve()
     for parent in current.parents:
         if (parent / "docs" / "api_reference.md").exists():
@@ -32,68 +23,58 @@ def get_project_root() -> Path:
     return Path.cwd()
 
 
-def read_file_safe(file_path: Path) -> str:
-    """Safely read a file."""
-    if not file_path.exists():
-        return ""
-    try:
-        return file_path.read_text(encoding="utf-8")
-    except Exception:
-        return ""
-
-
 def main():
-    """Main entry point for the session context loader hook."""
+    """主入口"""
     project_root = get_project_root()
     docs_dir = project_root / "docs"
     skills_dir = project_root / ".claude" / "skills"
 
     output = []
-    output.append("=" * 70)
-    output.append("MAINVISUALIZER SESSION CONTEXT LOADED")
-    output.append("=" * 70)
+    output.append("=" * 60)
+    output.append("MAINVISUALIZER PROJECT CONTEXT")
+    output.append("=" * 60)
+
+    # ========== Skills 摘要 ==========
+    output.append("")
+    output.append("## Available Skills")
     output.append("")
 
-    # ========== Section 1: API Query Skill ==========
-    api_query_skill = read_file_safe(skills_dir / "api-query" / "SKILL.md")
-    if api_query_skill:
-        output.append("-" * 70)
-        output.append("## SKILL: API Query")
-        output.append("-" * 70)
-        output.append("")
-        output.append(api_query_skill)
-        output.append("")
+    # API Query Skill
+    if (skills_dir / "api-query" / "SKILL.md").exists():
+        output.append("1. **api-query**: 查询现有模块 API")
+        output.append("   - 触发: 需要调用现有 API、查看接口签名、了解使用示例时")
+        output.append("   - 使用: 执行 skill `api-query`")
 
-    # ========== Section 2: API Doc Writer Skill ==========
-    api_doc_writer_skill = read_file_safe(skills_dir / "api-doc-writer" / "SKILL.md")
-    if api_doc_writer_skill:
-        output.append("-" * 70)
-        output.append("## SKILL: API Doc Writer")
-        output.append("-" * 70)
-        output.append("")
-        output.append(api_doc_writer_skill)
-        output.append("")
+    # API Doc Writer Skill
+    if (skills_dir / "api-doc-writer" / "SKILL.md").exists():
+        output.append("2. **api-doc-writer**: 为新模块编写 API 文档")
+        output.append("   - 触发: 完成新模块开发后需要添加 API 文档时")
+        output.append("   - 使用: 执行 skill `api-doc-writer`")
 
-    # ========== Section 3: Development Guide (Full) ==========
-    dev_guide = read_file_safe(docs_dir / "development_guide.md")
-    if dev_guide:
-        output.append("-" * 70)
-        output.append("## Development Guide (Full)")
-        output.append("-" * 70)
-        output.append("")
-        output.append(dev_guide)
-        output.append("")
-
-    # ========== Footer ==========
-    output.append("=" * 70)
-    output.append("END OF SESSION CONTEXT")
-    output.append("=" * 70)
+    # ========== 开发指南提醒 ==========
     output.append("")
-    output.append("Quick Reference:")
-    output.append("- API Index: docs/api_reference.md")
-    output.append("- API Details: docs/api/*.md")
-    output.append("- Architecture: docs/UW_MainVisualizer_InitialValidation.md")
+    output.append("## Development Guide")
     output.append("")
+
+    if (docs_dir / "development_guide.md").exists():
+        output.append("路径: `docs/development_guide.md`")
+        output.append("")
+        output.append("**何时阅读**:")
+        output.append("- 代码开发阶段: 首次进行代码修改前需完整阅读")
+        output.append("- 文档/测试阶段: 无需完整阅读，按需查阅")
+        output.append("")
+        output.append("**核心规范**:")
+        output.append("- 注释和文档字符串使用中文，禁止 emoji")
+        output.append("- 单文件 <= 800 行，单函数 <= 50 行")
+        output.append("- 模块间通过接口通信，禁止跨模块直接导入")
+
+    # ========== 快速参考 ==========
+    output.append("")
+    output.append("## Quick Reference")
+    output.append("- API 索引: `docs/api_reference.md`")
+    output.append("- 架构文档: `docs/UW_MainVisualizer_InitialValidation.md`")
+    output.append("")
+    output.append("=" * 60)
 
     print("\n".join(output))
     sys.exit(0)
