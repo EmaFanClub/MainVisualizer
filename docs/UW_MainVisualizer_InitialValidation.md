@@ -489,7 +489,7 @@ TIResult:
 **analyzers/visual_analyzer.py - 视觉敏感度分析**
 
 ```
-类: VisualSensitiveAnalyzer(BaseAnalyzer)
+类: VisualAnalyzer(BaseAnalyzer)
 职责: 评估截图的视觉敏感度
 
 核心方法:

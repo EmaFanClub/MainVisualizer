@@ -131,7 +131,7 @@ class ScreenshotMetadata(BaseModel):
             else:
                 tz_str = "+00:00"
             
-            datetime_str = f"{date_str}T{time_str.replace('-', ':')}:00{tz_str}"
+            datetime_str = f"{date_str}T{time_str.replace('-', ':')}{tz_str}"
             timestamp = datetime.fromisoformat(datetime_str)
             
             width = int(parts[3])

@@ -65,6 +65,37 @@ MainVisualizer/
 
 ## 2. Environment Setup
 
+
+### 2.0 System Requirements
+This project was developed and tested in the following environments:
+**Operating System**:
+- Windows 10 (Primary Development Environment)
+**Hardware Info**:
+- Memory: 128GB
+- Disk: 100GB+ free space (for screenshot caching and database)
+- Y:\ is not a network drive but a local HDD partition, it can be accessed.
+**Software Dependencies**:
+| Component | Version | Notes |
+|------|------|------|
+| Python | 3.11+ (Current: 3.14.2) | Recommended: 3.11 or 3.12 |
+| Git | 2.39+ | Version control |
+| Anaconda/Miniconda | Latest version | Environment management |
+**Core Python Packages**:
+| Package Name | Version | Purpose |
+|------|------|------|
+| pydantic | 2.12+ | Data model validation |
+| pillow | 12.0+ | Image processing |
+| openai | 2.14+ | VLM API calls (OpenAI-compatible interface) |
+| pytest | 9.0+ | Testing framework |
+| httpx | 0.28+ | HTTP client |
+**Optional dependencies**:
+- SQLAlchemy: Database ORM (Phase 2)
+- aiohttp: Asynchronous HTTP (concurrent VLM calls)
+- imagehash: Perceptual hashing (static frame detection)
+
+
+Translated with DeepL.com (free version)
+
 ### 2.1 Conda Environment
 
 The project uses a conda environment named `mv`. Always activate this environment before any development work.
@@ -985,5 +1016,5 @@ Before submitting any code, verify:
 
 ---
 
-*Last Updated: 2025-01*
+*Last Updated: 2025-12*
 *Document Version: 1.0*
