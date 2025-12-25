@@ -14,8 +14,8 @@
 6. [Development Workflow](#6-development-workflow)
 7. [Error Handling Protocol](#7-error-handling-protocol)
 8. [Testing Requirements](#8-testing-requirements)
-9. [Prohibited Behaviors](#9-prohibited-behaviors)
-10. [File Templates](#10-file-templates)
+9. [File Templates](#9-file-templates)
+10. [Quick Reference](#10-quick-reference)
 
 ---
 
@@ -55,8 +55,9 @@ MainVisualizer/
 │   ├── output/          # EMA output interface
 │   ├── pipeline/        # Processing pipeline orchestration
 │   └── utils/           # Utility functions
-├── tests/               # Test suites
+├── tests/               # Formal test suites (pytest)
 ├── scripts/             # Development and deployment scripts
+│   └── test/            # Development test scripts (standalone, not formal module)
 ├── docs/                # Documentation
 └── examples/            # Usage examples
 ```
@@ -65,71 +66,42 @@ MainVisualizer/
 
 ## 2. Environment Setup
 
+### 2.1 System Requirements
 
-### 2.0 System Requirements
-This project was developed and tested in the following environments:
-**Operating System**:
-- Windows 10 (Primary Development Environment)
-**Hardware Info**:
-- Memory: 128GB
-- Disk: 100GB+ free space (for screenshot caching and database)
-- Y:\ is not a network drive but a local HDD partition, it can be accessed.
-**Software Dependencies**:
 | Component | Version | Notes |
-|------|------|------|
-| Python | 3.11+ (Current: 3.14.2) | Recommended: 3.11 or 3.12 |
-| Git | 2.39+ | Version control |
-| Anaconda/Miniconda | Latest version | Environment management |
-**Core Python Packages**:
-| Package Name | Version | Purpose |
-|------|------|------|
+|-----------|---------|-------|
+| OS | Windows 10 | Primary Development Environment |
+| Python | 3.11+ | Recommended: 3.11 or 3.12 |
+| Memory | 128GB | For screenshot caching and database |
+| Disk | 100GB+ free | Y:\ is a local HDD partition, accessible |
+
+### 2.2 Core Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
 | pydantic | 2.12+ | Data model validation |
 | pillow | 12.0+ | Image processing |
-| openai | 2.14+ | VLM API calls (OpenAI-compatible interface) |
+| openai | 2.14+ | VLM API calls (OpenAI-compatible) |
 | pytest | 9.0+ | Testing framework |
 | httpx | 0.28+ | HTTP client |
-**Optional dependencies**:
-- SQLAlchemy: Database ORM (Phase 2)
-- aiohttp: Asynchronous HTTP (concurrent VLM calls)
-- imagehash: Perceptual hashing (static frame detection)
 
+**Optional**: SQLAlchemy, aiohttp, imagehash
 
-Translated with DeepL.com (free version)
+### 2.3 Conda Environment
 
-### 2.1 Conda Environment
-
-The project uses a conda environment named `mv`. Always activate this environment before any development work.
+The project uses conda environment `mv`. On Windows with non-interactive shells, use `conda run`:
 
 ```bash
-# Activate environment
-conda activate mv
+# Run script in conda environment (recommended for Claude Code)
+conda run -n mv python scripts/xxx.py
 
-# Verify activation
-which python  # Should point to conda env
+# Verify environment
+conda run -n mv python -c "import sys; print(sys.executable)"
 ```
 
-### 2.2 Required Commands
+### 2.4 Environment Variables
 
-```bash
-# Install dependencies
-pip install -e ".[dev]"
-
-# Run tests
-pytest tests/ -v
-
-# Type checking
-mypy src/
-
-# Linting
-ruff check src/
-
-# Format code
-ruff format src/
-```
-
-### 2.3 Environment Variables
-
-Copy `.env.example` to `.env` and configure:
+`.env` in project root contains API keys and paths:
 
 ```bash
 MANICTIME_DB_PATH=/path/to/ManicTimeCore.db
@@ -144,29 +116,15 @@ ANTHROPIC_API_KEY=your_key
 
 ### 3.1 Core Design Patterns
 
-The following patterns are MANDATORY throughout the codebase:
-
 | Pattern | Application | Implementation |
 |---------|-------------|----------------|
-| **Module Decoupling** | All modules communicate via interfaces | Define abstract base classes in `src/core/interfaces/` |
-| **Dependency Injection** | Module dependencies injected at runtime | Use `src/core/container.py` |
-| **Event-Driven** | Inter-module communication | Publish-subscribe via `src/core/event_bus.py` |
+| **Module Decoupling** | All modules communicate via interfaces | `src/core/interfaces/` |
+| **Dependency Injection** | Module dependencies injected at runtime | `src/core/container.py` |
+| **Event-Driven** | Inter-module communication | `src/core/event_bus.py` |
 | **Plugin Architecture** | Extensible components | Provider/Adapter pattern |
-| **Configuration Externalization** | All parameters configurable | YAML files + environment variables |
+| **Configuration Externalization** | All parameters configurable | YAML + env variables |
 
-### 3.2 Module Communication Rules
-
-**MUST**: Modules communicate ONLY through:
-1. Defined interfaces in `src/core/interfaces/`
-2. Event bus for async notifications
-3. Dependency injection container
-
-**MUST NOT**: 
-- Direct imports between sibling modules (e.g., senatus importing from cardina)
-- Shared mutable state between modules
-- Circular dependencies
-
-### 3.3 Data Flow
+### 3.2 Data Flow
 
 ```
 ManicTime Data
@@ -175,14 +133,10 @@ ManicTime Data
 [Ingest] --> ActivityEvent
       |
       v
-[Senatus] --> TriggerDecision
-      |
-      +--> ti > 0.8: Immediate VLM
-      +--> 0.5 < ti <= 0.8: Batch VLM
-      +--> ti <= 0.5: Skip VLM
+[Senatus] --> TriggerDecision (ti-based)
       |
       v
-[Admina] --> AnalysisResult (conditional)
+[Admina] --> AnalysisResult (conditional VLM)
       |
       v
 [Cardina] --> fs1 --> fs2 --> ... --> fn narrative
@@ -195,20 +149,36 @@ ManicTime Data
 
 ## 4. Code Style and Constraints
 
-### 4.1 Mandatory Rules (MUST)
+### 4.1 Size Limits
+
+All limits below are **MANDATORY**. See [Section 10 Quick Reference](#10-quick-reference) for the complete table.
+
+| Metric | Soft Limit | Hard Limit |
+|--------|------------|------------|
+| File lines | 500 | 800 |
+| Function lines | 30 | 50 |
+| Class lines | 200 | 300 |
+| Function parameters | 5 | 7 |
+| Nesting depth | 3 | 4 |
+
+When approaching limits, split files following these patterns:
+- `engine.py` (>500 lines) → `engine_core.py` + `engine_helpers.py`
+- `models.py` (>300 lines) → `models_activity.py` + `models_analysis.py`
+- Large class (>300 lines) → Extract mixins or delegate to helpers
+
+### 4.2 Mandatory Rules
 
 | Rule ID | Description |
 |---------|-------------|
-| **CS-1** | All code comments and docstrings MUST be written in Chinese |
-| **CS-2** | NO emojis or emoticons anywhere in code, comments, or logs |
-| **CS-3** | Single file MUST NOT exceed 500 lines (soft limit) or 800 lines (hard limit) |
-| **CS-4** | Single function MUST NOT exceed 50 lines (excluding docstrings) |
-| **CS-5** | Single class MUST NOT exceed 300 lines |
-| **CS-6** | Maximum function parameters: 7 (use dataclass/TypedDict for more) |
-| **CS-7** | Maximum nesting depth: 4 levels |
-| **CS-8** | All public functions MUST have type hints |
+| **CS-1** | All comments and docstrings MUST be in Chinese |
+| **CS-2** | NO emojis, emoticons, or special Unicode symbols (use ASCII: PASS/FAIL) |
+| **CS-3** | All public functions MUST have type hints |
+| **CS-4** | DO NOT use mutable default arguments |
+| **CS-5** | DO NOT catch bare `Exception` without re-raising |
+| **CS-6** | DO NOT use `print()` for logging (use `logging` module) |
+| **CS-7** | DO NOT hardcode configuration values |
 
-### 4.2 Naming Conventions
+### 4.3 Naming Conventions
 
 ```python
 # Classes: PascalCase
@@ -222,7 +192,6 @@ def calculate_ti_score(activity: ActivityEvent) -> float:
 
 # Constants: UPPER_SNAKE_CASE
 DEFAULT_TI_THRESHOLD = 0.8
-MAX_BATCH_SIZE = 100
 
 # Private members: leading underscore
 class Engine:
@@ -231,14 +200,9 @@ class Engine:
     
     def _process_internal(self):
         pass
-
-# Module-level private: leading underscore
-_module_cache = {}
 ```
 
-### 4.3 Comment Language (Chinese)
-
-All comments MUST be in Chinese:
+### 4.4 Comment Language (Chinese Example)
 
 ```python
 class SenatusEngine:
@@ -251,18 +215,11 @@ class SenatusEngine:
     Attributes:
         ti_calculator: TI指标计算器实例
         trigger_manager: 触发决策管理器
-        filters: Stage 1规则过滤器列表
-        classifier: Stage 2轻量分类器
     """
     
     def process_activity(self, activity: ActivityEvent) -> TriggerDecision:
         """
         处理单个活动事件
-        
-        执行三级级联推理：
-        1. Stage 1: 规则过滤 - 过滤90%静态/无关帧
-        2. Stage 2: 轻量分类 - 计算ti和置信度
-        3. Stage 3: 触发决策 - 根据阈值决定VLM调用
         
         Args:
             activity: 待处理的活动事件
@@ -280,7 +237,6 @@ class SenatusEngine:
         # Stage 1: 规则过滤
         for filter_ in self.filters:
             if filter_.should_skip(activity):
-                # 活动被过滤，直接返回跳过决策
                 return TriggerDecision(
                     decision_type=DecisionType.SKIP,
                     reason=f"被过滤器 {filter_.name} 过滤"
@@ -293,7 +249,7 @@ class SenatusEngine:
         return self.trigger_manager.evaluate_trigger(ti_result)
 ```
 
-### 4.4 Import Organization
+### 4.5 Import Organization
 
 ```python
 # 标准库导入
@@ -312,7 +268,6 @@ from sqlalchemy import select
 # 本地导入 - 核心模块
 from src.core.event_bus import EventBus
 from src.core.exceptions import MainVisualizerError
-from src.core.interfaces.base_module import BaseModule
 
 # 本地导入 - 当前模块
 from .models import TIResult, TriggerDecision
@@ -322,33 +277,71 @@ if TYPE_CHECKING:
     from src.cardina.models import ActivityEvent
 ```
 
-### 4.5 File Size Management
-
-When a file approaches size limits, split it following these patterns:
-
-| Original File | Split Strategy |
-|---------------|----------------|
-| `engine.py` (>500 lines) | Extract to `engine_core.py` + `engine_helpers.py` |
-| `models.py` (>300 lines) | Split by domain: `models_activity.py`, `models_analysis.py` |
-| Large class (>300 lines) | Extract mixins or delegate to helper classes |
-
-**Example Split**:
+### 4.6 Code Smells to Avoid
 
 ```python
-# Before: senatus/engine.py (600 lines)
+# BAD: 深层嵌套
+def process(items):
+    for item in items:
+        if item.is_valid:
+            for sub in item.children:
+                if sub.is_active:
+                    # 处理...
 
-# After:
-# senatus/engine.py (200 lines) - Main engine class
-# senatus/engine_cascade.py (150 lines) - Cascade logic
-# senatus/engine_batch.py (150 lines) - Batch processing
-# senatus/engine_utils.py (100 lines) - Helper functions
+# GOOD: 提前返回 + 提取函数
+def process(items):
+    valid_items = [i for i in items if i.is_valid]
+    for item in valid_items:
+        self._process_item(item)
+
+
+# BAD: 可变默认参数
+def add_item(item, items=[]):  # 危险！
+    items.append(item)
+
+# GOOD: 使用None
+def add_item(item, items=None):
+    if items is None:
+        items = []
+    items.append(item)
 ```
 
 ---
 
 ## 5. Module Boundaries
 
-### 5.1 Interface Definitions
+### 5.1 Module Dependency Matrix
+
+| Module | Can Import From | Cannot Import From |
+|--------|-----------------|-------------------|
+| `core` | (none - base layer) | ingest, senatus, admina, cardina, output |
+| `ingest` | core, utils | senatus, admina, cardina, output |
+| `senatus` | core, utils | admina, cardina, output |
+| `admina` | core, utils | senatus, cardina, output |
+| `cardina` | core, utils | senatus, admina, output |
+| `output` | core, utils, cardina (interfaces only) | senatus, admina, ingest |
+| `pipeline` | core, all modules (via interfaces) | (none) |
+
+```
+Import Direction:
+core <-- ingest <-- senatus <-- admina <-- cardina <-- output
+  ^                                                       |
+  |--------------------<-- pipeline <---------------------|
+```
+
+### 5.2 Communication Rules
+
+**MUST**: Modules communicate ONLY through:
+1. Defined interfaces in `src/core/interfaces/`
+2. Event bus for async notifications
+3. Dependency injection container
+
+**MUST NOT**: 
+- Direct imports between sibling modules
+- Shared mutable state between modules
+- Circular dependencies
+
+### 5.3 Interface Definition
 
 Each module MUST define its public interface in `__init__.py`:
 
@@ -367,62 +360,37 @@ from .engine import SenatusEngine
 from .models.ti_result import TIResult
 from .models.trigger_decision import TriggerDecision
 
-__all__ = [
-    "SenatusEngine",
-    "TIResult", 
-    "TriggerDecision",
-]
+__all__ = ["SenatusEngine", "TIResult", "TriggerDecision"]
 ```
 
-### 5.2 Cross-Module Communication
+### 5.4 Cross-Module Communication Examples
 
-**Allowed**:
 ```python
-# 通过接口通信
+# ALLOWED: 通过接口通信
 from src.core.interfaces.vlm_provider import VLMProvider
 
 class AdminaManager:
-    def __init__(self, provider: VLMProvider):
-        # 依赖注入，接受接口类型
+    def __init__(self, provider: VLMProvider):  # 依赖注入
         self._provider = provider
-```
 
-**Prohibited**:
-```python
-# 禁止直接导入具体实现
+# PROHIBITED: 直接导入具体实现
 from src.admina.providers.gemini_provider import GeminiProvider  # BAD
-
-# 禁止跨模块直接访问内部类
 from src.senatus.analyzers.visual_analyzer import VisualAnalyzer  # BAD
 ```
 
-### 5.3 Module Dependency Matrix
-
-| Module | Can Import From | Cannot Import From |
-|--------|-----------------|-------------------|
-| `core` | (none - base layer) | ingest, senatus, admina, cardina, output |
-| `ingest` | core, utils | senatus, admina, cardina, output |
-| `senatus` | core, utils | admina, cardina, output |
-| `admina` | core, utils | senatus, cardina, output |
-| `cardina` | core, utils | senatus, admina, output |
-| `output` | core, utils, cardina (interfaces only) | senatus, admina, ingest |
-| `pipeline` | core, all modules (via interfaces) | (none) |
-
-### 5.4 Event Bus Communication
-
-For cross-module notifications, use the event bus:
+### 5.5 Event Bus Usage
 
 ```python
-# 发布事件
 from src.core.event_bus import get_event_bus
 
 event_bus = get_event_bus()
+
+# 发布事件
 await event_bus.publish("NEW_ACTIVITIES", activities)
 
 # 订阅事件
 @event_bus.subscribe("VLM_ANALYSIS_COMPLETED")
 async def handle_analysis_completed(result: AnalysisResult):
-    # 处理VLM分析完成事件
     await self._store_result(result)
 ```
 
@@ -433,45 +401,18 @@ async def handle_analysis_completed(result: AnalysisResult):
 ### 6.1 Before Coding (MUST)
 
 1. **Clarify Requirements**: Ask clarifying questions if the task is ambiguous
-2. **Review Architecture**: Read relevant sections of `UW_MainVisualizer.md` and `UW_MainVisualizer_InitialValidation.md`
-3. **Read API Documentation**: Review `docs/api_reference.md` to understand existing APIs
-4. **Reuse Existing APIs**: Use existing functions/classes from the codebase instead of writing duplicate code
-5. **Plan Approach**: Draft implementation plan for complex tasks
-6. **Check Existing Code**: Search for similar patterns in the codebase
+2. **Review Architecture**: Read relevant sections of `UW_MainVisualizer.md`
+3. **Check Existing APIs**: Review `docs/api_reference.md` - reuse existing functions instead of duplicating
+4. **Plan Approach**: Draft implementation plan for complex tasks
 
-> **IMPORTANT**: Before implementing any new functionality, you MUST:
-> - Check if the functionality already exists in `docs/api_reference.md`
-> - If an existing API can fulfill the requirement, use it directly
+> **IMPORTANT**: Before implementing new functionality:
+> - Check if it already exists in `docs/api_reference.md`
 > - Only create new functions when no existing API meets the need
-> - When extending functionality, prefer extending existing classes over creating new ones
+> - Prefer extending existing classes over creating new ones
 
-### 6.2 Implementation Checklist
+### 6.2 Incremental Development
 
-Before writing code, verify:
-
-- [ ] Target file exists and location is correct
-- [ ] File will not exceed size limits after changes
-- [ ] Required interfaces are defined
-- [ ] No circular dependencies will be introduced
-- [ ] Test file location is identified
-
-### 6.3 Code Review Checklist
-
-After writing code, verify:
-
-- [ ] All comments are in Chinese
-- [ ] No emojis in code or comments
-- [ ] File size within limits
-- [ ] Function size within limits
-- [ ] Type hints on all public functions
-- [ ] Docstrings on all public classes and functions
-- [ ] No direct cross-module imports
-- [ ] Error handling is appropriate
-- [ ] Tests are written or updated
-
-### 6.4 Incremental Development
-
-For complex features, follow this sequence:
+For complex features:
 
 ```
 1. Define interface/protocol first
@@ -483,44 +424,30 @@ For complex features, follow this sequence:
 7. Refactor if needed
 ```
 
-### 6.5 API Documentation Requirements
+### 6.3 Verification Checklist
 
-After completing a module and passing all tests, you MUST update `docs/api_reference.md` with:
+Before submitting any code, verify ALL items:
 
-1. **Module Overview**: Brief description of the module's purpose
-2. **Public Classes**: All public class names with constructor signatures
-3. **Public Methods**: Method signatures with parameter and return types
-4. **Data Models**: All Pydantic models with field descriptions
-5. **Usage Examples**: Working code examples demonstrating typical usage
+| Category | Check Item |
+|----------|------------|
+| **Language** | All comments are in Chinese |
+| **Style** | No emojis anywhere in code/comments/logs |
+| **Size** | File under 800 lines, functions under 50 lines |
+| **Types** | Type hints on all public APIs |
+| **Docs** | Docstrings on all public classes and functions |
+| **Architecture** | No direct cross-module imports |
+| **Quality** | Error handling is appropriate |
+| **Testing** | Tests are written or updated |
+| **Design** | No design downgrade for error bypass |
 
-**Documentation Template**:
+### 6.4 API Documentation Requirements
 
-```markdown
-## Module Name
-
-### ClassName
-
-**Constructor:**
-\`\`\`python
-def __init__(self, param1: Type1, param2: Type2) -> None
-\`\`\`
-
-**Methods:**
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `method_name(args)` | `ReturnType` | Brief description |
-
-**Usage Example:**
-\`\`\`python
-# Working code example
-\`\`\`
-```
-
-**Verification Checklist:**
-- [ ] All public APIs documented in `docs/api_reference.md`
-- [ ] Verification script passes: `python scripts/verify_<module>.py`
-- [ ] Usage examples are tested and working
+After completing a module, update `docs/api_reference.md` with:
+1. Module Overview
+2. Public Classes (constructor signatures)
+3. Public Methods (signatures with types)
+4. Data Models (Pydantic models with field descriptions)
+5. Usage Examples
 
 ---
 
@@ -550,7 +477,7 @@ Attempted solutions:
 2. Changed return type to Optional[List] - same error
 3. Added default empty list - error persists
 
-Suspected cause: The upstream data source might be returning None in an unexpected case.
+Suspected cause: The upstream data source might be returning None unexpectedly.
 
 Would you like me to:
 A) Add more detailed logging to identify the exact data causing the issue?
@@ -588,10 +515,9 @@ class StorageError(MainVisualizerError):
     pass
 ```
 
-### 7.3 Error Handling Patterns
+### 7.3 Error Handling Pattern
 
 ```python
-# 正确的错误处理模式
 async def analyze_screenshot(self, screenshot: Image) -> AnalysisResult:
     """
     分析截图内容
@@ -600,20 +526,15 @@ async def analyze_screenshot(self, screenshot: Image) -> AnalysisResult:
         VLMProviderError: VLM调用失败时抛出
         InvalidImageError: 图像格式无效时抛出
     """
-    # 验证输入
     if screenshot is None:
         raise InvalidImageError("截图不能为空")
     
     try:
-        # 调用VLM
         response = await self._provider.analyze(screenshot)
     except ProviderConnectionError as e:
-        # 记录详细错误信息
         logger.error(f"VLM连接失败: {e}", exc_info=True)
-        # 包装并重新抛出
         raise VLMProviderError(f"无法连接到VLM服务: {e}") from e
     except ProviderRateLimitError as e:
-        # 特定错误的特定处理
         logger.warning(f"VLM速率限制: {e}")
         raise
     
@@ -633,19 +554,23 @@ async def analyze_screenshot(self, screenshot: Image) -> AnalysisResult:
 | Providers (admina/providers/) | 70% |
 | Utils | 80% |
 
-### 8.2 Test File Organization
+### 8.2 Test Organization
+
+| Directory | Runner | Purpose | Dependencies |
+|-----------|--------|---------|--------------|
+| `tests/` | pytest | CI/CD, formal testing | Mock/fixtures |
+| `scripts/test/` | Direct python | Development, debugging | Real data/APIs |
 
 ```
 tests/
-├── unit/                    # 单元测试
+├── unit/
 │   ├── test_senatus/
 │   │   ├── test_ti_calculator.py
 │   │   └── test_engine.py
 │   └── ...
-├── integration/             # 集成测试
-│   ├── test_pipeline.py
-│   └── ...
-└── e2e/                     # 端到端测试
+├── integration/
+│   └── test_pipeline.py
+└── e2e/
     └── test_full_workflow.py
 ```
 
@@ -661,16 +586,12 @@ class TestTabooIndexCalculator:
         """测试高视觉敏感度活动返回高ti值"""
         pass
     
-    def test_calculate_with_static_frame_returns_low_ti(self):
-        """测试静态帧返回低ti值"""
-        pass
-    
     def test_calculate_with_invalid_activity_raises_error(self):
         """测试无效活动数据抛出异常"""
         pass
 ```
 
-### 8.4 Mock and Fixture Usage
+### 8.4 Fixtures
 
 ```python
 # tests/conftest.py
@@ -701,101 +622,9 @@ def sample_activity():
 
 ---
 
-## 9. Prohibited Behaviors
+## 9. File Templates
 
-### 9.1 Absolute Prohibitions (DO NOT)
-
-| ID | Prohibition | Reason |
-|----|-------------|--------|
-| **P-1** | DO NOT use emojis, emoticons, or special Unicode symbols (✓✗★●◆ etc.) | Professional codebase standard, use ASCII text like PASS/FAIL |
-| **P-2** | DO NOT downgrade/simplify design when errors occur | Preserves architectural integrity |
-| **P-3** | DO NOT create files exceeding 800 lines | Maintainability |
-| **P-4** | DO NOT create functions exceeding 50 lines | Readability and testability |
-| **P-5** | DO NOT import directly between sibling modules | Module decoupling |
-| **P-6** | DO NOT use mutable default arguments | Python gotcha |
-| **P-7** | DO NOT catch bare `Exception` without re-raising | Error handling clarity |
-| **P-8** | DO NOT use `print()` for logging | Use proper logging |
-| **P-9** | DO NOT hardcode configuration values | Use config files |
-| **P-10** | DO NOT write comments in English | Project standard (Chinese) |
-
-### 9.2 Code Smells to Avoid
-
-```python
-# BAD: 巨型函数
-def process_everything(data):
-    # 200行代码...
-    pass
-
-# GOOD: 拆分为小函数
-def process_everything(data):
-    validated = self._validate_data(data)
-    transformed = self._transform_data(validated)
-    return self._finalize_result(transformed)
-
-
-# BAD: 深层嵌套
-def process(items):
-    for item in items:
-        if item.is_valid:
-            for sub in item.children:
-                if sub.is_active:
-                    for detail in sub.details:
-                        if detail.value > 0:
-                            # 处理...
-
-# GOOD: 提前返回 + 提取函数
-def process(items):
-    valid_items = [i for i in items if i.is_valid]
-    for item in valid_items:
-        self._process_item(item)
-
-def _process_item(self, item):
-    active_children = [c for c in item.children if c.is_active]
-    for child in active_children:
-        self._process_child(child)
-
-
-# BAD: 可变默认参数
-def add_item(item, items=[]):  # 危险！
-    items.append(item)
-    return items
-
-# GOOD: 使用None
-def add_item(item, items=None):
-    if items is None:
-        items = []
-    items.append(item)
-    return items
-```
-
-### 9.3 Anti-Patterns in Module Design
-
-```python
-# BAD: 上帝类
-class MainVisualizerDoEverything:
-    def ingest_data(self): ...
-    def calculate_ti(self): ...
-    def call_vlm(self): ...
-    def aggregate_data(self): ...
-    def generate_narrative(self): ...
-    def output_to_ema(self): ...
-
-# GOOD: 单一职责
-class IngestManager:
-    def ingest_data(self): ...
-
-class SenatusEngine:
-    def calculate_ti(self): ...
-
-class AdminaManager:
-    def call_vlm(self): ...
-```
-
----
-
-## 10. File Templates
-
-### 10.1 Module File Template
+### 9.1 Module File Template
 
 ```python
 """
@@ -857,7 +686,7 @@ class <ClassName>:
         pass
 ```
 
-### 10.2 Test File Template
+### 9.2 Test File Template
 
 ```python
 """
@@ -916,7 +745,7 @@ class Test<ClassName>:
         mock_dependency.some_method.assert_called_once()
 ```
 
-### 10.3 Interface Definition Template
+### 9.3 Interface Definition Template
 
 ```python
 """
@@ -966,9 +795,9 @@ class <InterfaceName>(ABC, Generic[T]):
 
 ---
 
-## Appendix A: Quick Reference Card
+## 10. Quick Reference
 
-### File Size Limits
+### 10.1 Size Limits (Authoritative)
 
 | Metric | Soft Limit | Hard Limit |
 |--------|------------|------------|
@@ -978,7 +807,7 @@ class <InterfaceName>(ABC, Generic[T]):
 | Function parameters | 5 | 7 |
 | Nesting depth | 3 | 4 |
 
-### Module Import Rules
+### 10.2 Module Import Diagram
 
 ```
 core <-- ingest <-- senatus <-- admina <-- cardina <-- output
@@ -986,35 +815,29 @@ core <-- ingest <-- senatus <-- admina <-- cardina <-- output
   |--------------------<-- pipeline <---------------------|
 ```
 
-### ti Threshold Quick Reference
+### 10.3 Common Commands
 
-| ti Value | Action |
-|----------|--------|
-| > 0.8 | Immediate VLM analysis |
-| 0.5 - 0.8 | Batch VLM analysis |
-| 0.3 - 0.5 | Lightweight classification only |
-| <= 0.3 | Skip analysis |
+```bash
+# Run in conda environment
+conda run -n mv python scripts/xxx.py
 
----
+# Run tests
+pytest tests/ -v
 
-## Appendix B: Checklist for AI Assistant
+# Type checking
+mypy src/
 
-Before submitting any code, verify:
-
-```
-[ ] Comments are in Chinese
-[ ] No emojis anywhere
-[ ] File under 800 lines
-[ ] Functions under 50 lines
-[ ] No cross-module direct imports
-[ ] Type hints on public APIs
-[ ] Docstrings present
-[ ] Error handling appropriate
-[ ] Tests written/updated
-[ ] No design downgrade for error bypass
+# Linting & Format
+ruff check src/
+ruff format src/
 ```
 
 ---
 
-*Last Updated: 2025-12*
-*Document Version: 1.0*
+*Last Updated: 2025-12-25*
+*Document Version: 2.0*
+
+### Changelog
+- v2.0 (2025-12-25): Consolidated duplicate content, unified size limits, reorganized structure
+- v1.1 (2025-12-25): Added Windows conda experience, scripts/test directory notes
+- v1.0 (2025-12): Initial version

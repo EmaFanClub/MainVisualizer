@@ -7,6 +7,7 @@ ManicTime 截图加载器
 
 from __future__ import annotations
 
+import bisect
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -50,12 +51,13 @@ class ScreenshotLoader(IScreenshotLoader):
     def __init__(self, screenshots_path: Path | str) -> None:
         """
         初始化截图加载器
-        
+
         Args:
             screenshots_path: 截图目录路径
         """
         self.screenshots_path = Path(screenshots_path)
         self._screenshot_index: dict[datetime, ScreenshotMetadata] = {}
+        self._sorted_timestamps: list[datetime] = []  # 排序的时间戳列表，用于二分查找
         self._index_built = False
     
     def _ensure_pil_available(self) -> None:
@@ -97,9 +99,11 @@ class ScreenshotLoader(IScreenshotLoader):
                     self._screenshot_index[metadata.timestamp] = metadata
                     count += 1
         
+        # 构建排序的时间戳列表，用于二分查找
+        self._sorted_timestamps = sorted(self._screenshot_index.keys())
         self._index_built = True
         logger.info(f"截图索引构建完成，共 {count} 张截图")
-    
+
     def _find_closest_screenshot(
         self,
         timestamp: datetime,
@@ -107,30 +111,44 @@ class ScreenshotLoader(IScreenshotLoader):
     ) -> Optional[ScreenshotMetadata]:
         """
         查找最接近指定时间戳的截图
-        
+
+        使用二分查找实现 O(log n) 时间复杂度
+
         Args:
             timestamp: 目标时间戳
             tolerance_seconds: 时间容差（秒）
-            
+
         Returns:
             最接近的ScreenshotMetadata，如果在容差范围内没有找到则返回None
         """
         self._build_index()
-        
-        if not self._screenshot_index:
+
+        if not self._sorted_timestamps:
             return None
-        
-        # 查找时间差最小的截图
+
+        # 使用二分查找定位时间戳位置
+        idx = bisect.bisect_left(self._sorted_timestamps, timestamp)
+        tolerance = timedelta(seconds=tolerance_seconds)
+
+        # 检查候选位置: idx-1, idx (最多检查2个位置)
+        candidates = []
+        if idx > 0:
+            candidates.append(idx - 1)
+        if idx < len(self._sorted_timestamps):
+            candidates.append(idx)
+
+        # 在候选位置中找最接近的
         min_diff = timedelta(seconds=tolerance_seconds + 1)
         closest = None
-        
-        for ts, metadata in self._screenshot_index.items():
+
+        for i in candidates:
+            ts = self._sorted_timestamps[i]
             diff = abs(ts - timestamp)
             if diff < min_diff:
                 min_diff = diff
-                closest = metadata
-        
-        if closest and min_diff <= timedelta(seconds=tolerance_seconds):
+                closest = self._screenshot_index[ts]
+
+        if closest and min_diff <= tolerance:
             return closest
         return None
     
@@ -307,17 +325,17 @@ class ScreenshotLoader(IScreenshotLoader):
     def get_date_range(self) -> tuple[Optional[datetime], Optional[datetime]]:
         """
         获取截图的时间范围
-        
+
         Returns:
             (最早时间, 最晚时间) 元组
         """
         self._build_index()
-        
-        if not self._screenshot_index:
+
+        if not self._sorted_timestamps:
             return (None, None)
-        
-        timestamps = sorted(self._screenshot_index.keys())
-        return (timestamps[0], timestamps[-1])
+
+        # 直接使用已排序的时间戳列表
+        return (self._sorted_timestamps[0], self._sorted_timestamps[-1])
     
     def get_metadata(
         self, 

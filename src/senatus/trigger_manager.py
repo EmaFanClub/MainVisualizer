@@ -27,14 +27,17 @@ class TriggerThresholds:
     """
     触发阈值配置
 
+    基于2356条活动数据分析优化 (2025-12-25)
+    TI分布: avg=0.4515, max=0.6438, P90=0.5455, P95=0.5610
+
     Attributes:
-        immediate_threshold: 立即触发阈值 (默认 0.7)
-        batch_threshold: 批处理阈值 (默认 0.4)
-        skip_threshold: 跳过阈值 (默认 0.2)
+        immediate_threshold: 立即触发阈值 (默认 0.55, P90)
+        batch_threshold: 批处理阈值 (默认 0.45, P75附近)
+        skip_threshold: 跳过阈值 (默认 0.35, P25附近)
     """
-    immediate_threshold: float = 0.7
-    batch_threshold: float = 0.4
-    skip_threshold: float = 0.2
+    immediate_threshold: float = 0.55
+    batch_threshold: float = 0.45
+    skip_threshold: float = 0.35
 
     def __post_init__(self) -> None:
         """验证阈值配置"""

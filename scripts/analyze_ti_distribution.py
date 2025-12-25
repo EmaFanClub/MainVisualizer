@@ -3,10 +3,13 @@ TI 分布分析脚本
 
 从 ManicTime 数据库读取真实活动数据，计算 TI 分布情况，
 用于验证和调优阈值设置。
+
+分析结果保存至 data/ti_analysis/ 目录。
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -27,6 +30,7 @@ from src.senatus.models import TILevel
 DB_PATH = Path(r"D:\code_field\manicData\db\ManicTimeReports.db")
 SCREENSHOTS_PATH = Path(r"Y:\临时文件\ManicTimeScreenShots")
 MIN_ACTIVITIES = 1000  # 最小测试数据量
+OUTPUT_DIR = PROJECT_ROOT / "data" / "ti_analysis"
 
 logger = get_logger(__name__)
 
@@ -68,7 +72,7 @@ def analyze_ti_distribution(
     engine: SenatusEngine,
     activities: list,
     screenshot_loader: Optional[ScreenshotLoader] = None,
-) -> dict:
+) -> tuple[dict, list[float]]:
     """
     分析 TI 分布
 
@@ -78,7 +82,7 @@ def analyze_ti_distribution(
         screenshot_loader: 截图加载器(可选)
 
     Returns:
-        分析结果字典
+        (分析结果字典, TI分数列表) 元组
     """
     ti_scores = []
     ti_levels = Counter()
@@ -175,7 +179,7 @@ def analyze_ti_distribution(
         key=lambda x: x[1],
     )[:15]
 
-    return {
+    results = {
         "total_activities": total,
         "analyzed_count": len(ti_scores),
         "filtered_count": filtered_count,
@@ -191,6 +195,8 @@ def analyze_ti_distribution(
         "top_low_ti_apps": top_low_ti_apps,
         "engine_stats": engine.get_stats(),
     }
+
+    return results, ti_scores
 
 
 def print_report(results: dict) -> None:
@@ -268,6 +274,53 @@ def print_report(results: dict) -> None:
     print("\n" + "=" * 70)
 
 
+def save_results(results: dict, ti_scores: list[float], output_dir: Path) -> Path:
+    """
+    保存分析结果到文件
+
+    Args:
+        results: 分析结果字典
+        ti_scores: 所有TI分数列表
+        output_dir: 输出目录
+
+    Returns:
+        保存的文件路径
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = output_dir / f"ti_analysis_{timestamp}.json"
+
+    # 准备保存数据
+    save_data = {
+        "analysis_time": datetime.now().isoformat(),
+        "summary": {
+            "total_activities": results["total_activities"],
+            "analyzed_count": results["analyzed_count"],
+            "filtered_count": results["filtered_count"],
+            "filter_rate": results["filter_rate"],
+        },
+        "ti_distribution": {
+            "avg": results["avg_ti"],
+            "median": results["median_ti"],
+            "min": results["min_ti"],
+            "max": results["max_ti"],
+            "percentiles": results["percentiles"],
+        },
+        "ti_levels": results["ti_levels"],
+        "decision_types": results["decision_types"],
+        "top_high_ti_apps": results["top_high_ti_apps"],
+        "top_low_ti_apps": results["top_low_ti_apps"],
+        "engine_stats": results["engine_stats"],
+        "all_ti_scores": ti_scores,
+    }
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(save_data, f, ensure_ascii=False, indent=2)
+
+    return output_file
+
+
 def main():
     """主函数"""
     setup_logging()
@@ -323,10 +376,14 @@ def main():
 
             # 分析 TI 分布
             print(f"\n开始分析 TI 分布...")
-            results = analyze_ti_distribution(engine, activities, screenshot_loader)
+            results, ti_scores = analyze_ti_distribution(engine, activities, screenshot_loader)
 
             # 打印报告
             print_report(results)
+
+            # 保存结果
+            output_file = save_results(results, ti_scores, OUTPUT_DIR)
+            print(f"\n分析结果已保存至: {output_file}")
 
     except DatabaseConnectionError as e:
         print(f"数据库连接错误: {e}")

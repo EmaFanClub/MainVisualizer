@@ -3,6 +3,10 @@
 
 评估截图的视觉复杂度和敏感度，基于图像特征进行分析。
 权重: 0.35 (最高权重分析器)
+
+优化策略:
+- 支持 PyTorch 批量处理器加速 (BatchImageProcessor)
+- 回退到纯 Python 实现 (当 PyTorch 不可用时)
 """
 
 from __future__ import annotations
@@ -15,6 +19,20 @@ from .base_analyzer import BaseAnalyzer, AnalyzerResult
 if TYPE_CHECKING:
     from PIL import Image
     from src.ingest.manictime.models import ActivityEvent
+
+# 尝试导入批量处理器
+_BATCH_PROCESSOR_AVAILABLE = False
+_batch_processor = None
+
+try:
+    from src.senatus.batch_image_processor import (
+        get_batch_processor,
+        TORCH_AVAILABLE,
+    )
+    if TORCH_AVAILABLE:
+        _BATCH_PROCESSOR_AVAILABLE = True
+except ImportError:
+    pass
 
 
 # 应用类型敏感度权重
@@ -52,7 +70,25 @@ APP_TYPE_SENSITIVITY = {
 }
 
 
-def _compute_image_entropy(image: Image.Image) -> float:
+def _get_image_features_fast(image: "Image.Image") -> tuple[float, float]:
+    """
+    使用 PyTorch 批量处理器快速获取图像特征
+
+    Args:
+        image: PIL 图像对象
+
+    Returns:
+        (熵值, 文本密度) 元组
+    """
+    global _batch_processor
+    if _batch_processor is None:
+        _batch_processor = get_batch_processor()
+
+    features = _batch_processor.process_single(image)
+    return features.entropy, features.text_density
+
+
+def _compute_image_entropy(image: "Image.Image") -> float:
     """
     计算图像的信息熵
 
@@ -96,6 +132,7 @@ def _estimate_text_density(image: Image.Image) -> float:
     估算图像中的文本密度
 
     使用边缘检测的简化方法评估文本区域
+    优化版: 使用更小的缩放尺寸和采样策略
 
     Args:
         image: PIL 图像对象
@@ -107,36 +144,38 @@ def _estimate_text_density(image: Image.Image) -> float:
     if image.mode != 'L':
         gray = image.convert('L')
     else:
-        gray = image.copy()
+        gray = image
 
-    # 缩放以加快处理
+    # 大幅缩放以加快处理 (200px 足以评估文本密度)
     width, height = gray.size
-    scale = 1.0
-    if width > 400 or height > 400:
-        scale = 400 / max(width, height)
+    if width > 200 or height > 200:
+        scale = 200 / max(width, height)
         new_size = (int(width * scale), int(height * scale))
-        gray = gray.resize(new_size, resample=1)  # LANCZOS
+        gray = gray.resize(new_size, resample=0)  # NEAREST (最快)
 
-    # 使用简单的梯度计算估算边缘
-    pixels = list(gray.getdata())
+    # 获取像素数据
+    pixels = gray.tobytes()  # 比 list(getdata()) 更快
     width, height = gray.size
 
     edge_count = 0
     total_checks = 0
 
-    for y in range(1, height - 1):
-        for x in range(1, width - 1):
-            idx = y * width + x
+    # 使用步长 2 采样，减少计算量 4 倍
+    step = 2
+    for y in range(1, height - 1, step):
+        row_offset = y * width
+        for x in range(1, width - 1, step):
+            idx = row_offset + x
 
             # 计算水平和垂直梯度
             gx = abs(pixels[idx + 1] - pixels[idx - 1])
             gy = abs(pixels[idx + width] - pixels[idx - width])
 
             # 梯度幅值
-            gradient = (gx + gy) / 2
+            gradient = (gx + gy) >> 1  # 位运算更快
 
             # 高梯度表示边缘（文本通常有清晰的边缘）
-            if gradient > 30:  # 阈值
+            if gradient > 30:
                 edge_count += 1
 
             total_checks += 1
@@ -177,6 +216,7 @@ class VisualAnalyzer(BaseAnalyzer):
         weight: float = 0.35,
         enabled: bool = True,
         custom_app_sensitivity: Optional[dict] = None,
+        use_batch_processor: bool = True,
     ) -> None:
         """
         初始化视觉敏感度分析器
@@ -185,8 +225,14 @@ class VisualAnalyzer(BaseAnalyzer):
             weight: 权重
             enabled: 是否启用
             custom_app_sensitivity: 自定义应用敏感度配置
+            use_batch_processor: 是否使用 PyTorch 批量处理器加速
         """
         super().__init__(name="visual", weight=weight, enabled=enabled)
+
+        # 设置是否使用批量处理器
+        self._use_batch_processor = (
+            use_batch_processor and _BATCH_PROCESSOR_AVAILABLE
+        )
 
         # 合并自定义配置
         self._app_sensitivity = dict(APP_TYPE_SENSITIVITY)
@@ -233,9 +279,12 @@ class VisualAnalyzer(BaseAnalyzer):
                 },
             )
 
-        # 计算图像特征
-        entropy = _compute_image_entropy(screenshot)
-        text_density = _estimate_text_density(screenshot)
+        # 计算图像特征 (根据配置选择处理器)
+        if self._use_batch_processor:
+            entropy, text_density = _get_image_features_fast(screenshot)
+        else:
+            entropy = _compute_image_entropy(screenshot)
+            text_density = _estimate_text_density(screenshot)
 
         # 综合评分
         # 应用类型权重 40%, 熵值权重 30%, 文本密度权重 30%
@@ -315,7 +364,7 @@ class VisualAnalyzer(BaseAnalyzer):
 
     def analyze_image_only(
         self,
-        screenshot: Image.Image,
+        screenshot: "Image.Image",
     ) -> dict:
         """
         仅分析图像特征
@@ -326,8 +375,11 @@ class VisualAnalyzer(BaseAnalyzer):
         Returns:
             包含熵值和文本密度的字典
         """
-        entropy = _compute_image_entropy(screenshot)
-        text_density = _estimate_text_density(screenshot)
+        if self._use_batch_processor:
+            entropy, text_density = _get_image_features_fast(screenshot)
+        else:
+            entropy = _compute_image_entropy(screenshot)
+            text_density = _estimate_text_density(screenshot)
 
         return {
             "entropy": entropy,
